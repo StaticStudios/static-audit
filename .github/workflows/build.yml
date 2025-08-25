@@ -26,7 +26,7 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build with Gradle Wrapper
-        run: ./gradlew :menus:build -PStaticStudiosUsername=github -PStaticStudiosPassword=${{ secrets.REPOSITORY_SECRET }}
+        run: ./gradlew :build -PStaticStudiosUsername=github -PStaticStudiosPassword=${{ secrets.REPOSITORY_SECRET }}
 
       - name: Run Tests
         run: ./gradlew test
