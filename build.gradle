@@ -1,0 +1,93 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'com.gradleup.shadow' version '8.3.3'
+}
+
+group = 'net.staticstudios'
+version = '1.0.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+    maven {
+        name = "StaticStudios"
+        url = 'https://repo.staticstudios.net/snapshots/'
+    }
+}
+
+dependencies {
+    implementation 'net.staticstudios:static-utils:1.0.6-SNAPSHOT'
+    implementation 'org.jetbrains:annotations:24.0.1'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.1'
+
+    testImplementation("org.testcontainers:postgresql:1.19.8")
+    testImplementation("org.slf4j:slf4j-log4j12:2.0.16")
+}
+
+tasks.named('build') {
+    dependsOn(shadowJar)
+}
+
+tasks.named("publish") {
+    dependsOn(build)
+}
+
+test {
+    useJUnitPlatform()
+}
+
+java {
+    withSourcesJar()
+    withJavadocJar()
+}
+
+javadoc {
+    options.tags = ["implSpec", "apiNote", "implNote"]
+}
+
+publishing {
+    repositories {
+        maven {
+            credentials(org.gradle.api.credentials.PasswordCredentials.class)
+            name = "StaticStudios"
+            var base = "https://repo.staticstudios.net"
+            var releasesRepoUrl = "$base/releases/"
+            var snapshotsRepoUrl = "$base/snapshots/"
+            setUrl((version.toString().endsWith("SNAPSHOT")) ? snapshotsRepoUrl : releasesRepoUrl)
+        }
+    }
+    publications {
+        maven(MavenPublication) {
+            from components.java
+            pom {
+                name = 'Static Audit'
+                description = 'Simple audit logging library used by StaticStudios.'
+                url = 'https://github.com/StaticStudios/static-audit'
+                developers {
+                    developer {
+                        id = 'staticstudios'
+                        name = 'Static Studios'
+                        email = 'support@staticstudios.net'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:git://github.com/StaticStudios/static-audit.git'
+                    developerConnection = 'scm:git:ssh://github.com:StaticStudios/static-audit.git'
+                    url = 'https://github.com/StaticStudios/static-audit'
+                }
+            }
+        }
+    }
+}
+
+def targetJavaVersion = 21
+java {
+    def javaVersion = JavaVersion.toVersion(targetJavaVersion)
+    sourceCompatibility = javaVersion
+    targetCompatibility = javaVersion
+    if (JavaVersion.current() < javaVersion) {
+        toolchain.languageVersion = JavaLanguageVersion.of(targetJavaVersion)
+    }
+}
