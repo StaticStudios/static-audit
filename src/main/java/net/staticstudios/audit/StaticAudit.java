@@ -286,8 +286,6 @@ public class StaticAudit {
                 sqlBuilder.append(")");
             }
 
-            logger.trace(sqlBuilder.toString());
-
             sqlBuilder.append(" ORDER BY timestamp DESC LIMIT ?");
             String sql = sqlBuilder.toString().formatted(schemaName, tableName);
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
