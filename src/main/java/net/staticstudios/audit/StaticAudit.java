@@ -10,10 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.*;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
@@ -242,13 +239,13 @@ public class StaticAudit {
      * @param sessionId The session ID to filter by, or null for any session.
      * @param from      The start timestamp for filtering, or null for no lower bound.
      * @param to        The end timestamp for filtering, or null for no upper bound.
-     * @param actionId  The action ID to filter by, or null for any action.
+     * @param actionIds  The action IDs to filter by, or null for any action.
      * @param limit     The maximum number of entries to retrieve.
      * @return A CompletableFuture containing the list of matching audit log entries.
      */
-    public CompletableFuture<List<AuditLogEntry<?>>> retrieveAsync(@NotNull UUID userId, @Nullable UUID sessionId, @Nullable Instant from, @Nullable Instant to, @Nullable String actionId, int limit) {
+    public CompletableFuture<List<AuditLogEntry<?>>> retrieveAsync(@NotNull UUID userId, @Nullable UUID sessionId, @Nullable Instant from, @Nullable Instant to, int limit, String... actionIds) {
         CompletableFuture<List<AuditLogEntry<?>>> future = new CompletableFuture<>();
-        async(() -> future.complete(retrieve(userId, sessionId, from, to, actionId, limit)));
+        async(() -> future.complete(retrieve(userId, sessionId, from, to, limit, actionIds)));
         return future;
     }
 
@@ -259,11 +256,11 @@ public class StaticAudit {
      * @param sessionId The session ID to filter by, or null for any session.
      * @param from      The start timestamp for filtering, or null for no lower bound.
      * @param to        The end timestamp for filtering, or null for no upper bound.
-     * @param actionId  The action ID to filter by, or null for any action.
+     * @param actionIds  The action IDs to filter by, or null for any action.
      * @param limit     The maximum number of entries to retrieve.
      * @return The list of matching audit log entries.
      */
-    public List<AuditLogEntry<?>> retrieve(@NotNull UUID userId, @Nullable UUID sessionId, @Nullable Instant from, @Nullable Instant to, @Nullable String actionId, int limit) {
+    public List<AuditLogEntry<?>> retrieve(@NotNull UUID userId, @Nullable UUID sessionId, @Nullable Instant from, @Nullable Instant to, int limit, String... actionIds) {
         Preconditions.checkNotNull(userId, "User ID cannot be null");
         Preconditions.checkArgument(limit > 0, "Limit must be greater than 0");
         List<AuditLogEntry<?>> entries = new ArrayList<>();
@@ -279,9 +276,16 @@ public class StaticAudit {
             if (to != null) {
                 sqlBuilder.append(" AND timestamp <= ?");
             }
-            if (actionId != null) {
-                sqlBuilder.append(" AND action_id = ?");
+            if (actionIds.length > 0) {
+                sqlBuilder.append(" AND action_id IN (?");
+
+                if (actionIds.length > 1 ) {
+                    sqlBuilder.repeat(", ?", actionIds.length - 1);
+                }
+
+                sqlBuilder.append(")");
             }
+
             sqlBuilder.append(" ORDER BY timestamp DESC LIMIT ?");
             String sql = sqlBuilder.toString().formatted(schemaName, tableName);
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
@@ -296,7 +300,7 @@ public class StaticAudit {
                 if (to != null) {
                     statement.setObject(index++, Timestamp.from(to));
                 }
-                if (actionId != null) {
+                for (String actionId : actionIds) {
                     statement.setString(index++, actionId);
                 }
                 statement.setInt(index, limit);
