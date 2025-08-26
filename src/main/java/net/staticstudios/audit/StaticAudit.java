@@ -303,7 +303,7 @@ public class StaticAudit {
                     statement.setObject(index++, Timestamp.from(to));
                 }
                 for (String actionId : actionIds) {
-                    statement.setObject(index++, actionId);
+                    statement.setString(index++, actionId);
                 }
                 statement.setInt(index, limit);
                 logger.trace(statement.toString());
