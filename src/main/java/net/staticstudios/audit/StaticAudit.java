@@ -10,7 +10,10 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.*;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
@@ -239,7 +242,7 @@ public class StaticAudit {
      * @param sessionId The session ID to filter by, or null for any session.
      * @param from      The start timestamp for filtering, or null for no lower bound.
      * @param to        The end timestamp for filtering, or null for no upper bound.
-     * @param actionIds  The action IDs to filter by, or null for any action.
+     * @param actionIds The action IDs to filter by, or null for any action.
      * @param limit     The maximum number of entries to retrieve.
      * @return A CompletableFuture containing the list of matching audit log entries.
      */
@@ -256,14 +259,61 @@ public class StaticAudit {
      * @param sessionId The session ID to filter by, or null for any session.
      * @param from      The start timestamp for filtering, or null for no lower bound.
      * @param to        The end timestamp for filtering, or null for no upper bound.
-     * @param actionIds  The action IDs to filter by, or null for any action.
+     * @param actionIds The action IDs to filter by, or null for any action.
      * @param limit     The maximum number of entries to retrieve.
      * @return The list of matching audit log entries.
      */
     public List<AuditLogEntry<?>> retrieve(@NotNull UUID userId, @Nullable UUID sessionId, @Nullable Instant from, @Nullable Instant to, int limit, String... actionIds) {
+        List<EncodedAuditLogEntry> encodedList = retrieveEncoded(userId, sessionId, from, to, limit, actionIds);
+        encodedList.removeIf(encoded -> {
+            if (!actions.containsKey(encoded.getActionId())) {
+                logger.warn("Unknown action ID {} in audit log, skipping entry", encoded.getActionId());
+                return true;
+            } else {
+                return false;
+            }
+        });
+
+        List<AuditLogEntry<?>> entries = new ArrayList<>();
+        for (EncodedAuditLogEntry encoded : encodedList) {
+            entries.add(createEntry(encoded));
+        }
+
+        return entries;
+    }
+
+    /**
+     * Retrieves encoded audit log entries asynchronously for a given user and optional filters.
+     *
+     * @param userId    The ID of the user whose logs to retrieve.
+     * @param sessionId The session ID to filter by, or null for any session.
+     * @param from      The start timestamp for filtering, or null for no lower bound.
+     * @param to        The end timestamp for filtering, or null for no upper bound.
+     * @param actionIds The action IDs to filter by, or null for any action.
+     * @param limit     The maximum number of entries to retrieve.
+     * @return A CompletableFuture containing the list of matching audit log entries.
+     */
+    public CompletableFuture<List<EncodedAuditLogEntry>> retrieveEncodedAsync(@NotNull UUID userId, @Nullable UUID sessionId, @Nullable Instant from, @Nullable Instant to, int limit, String... actionIds) {
+        CompletableFuture<List<EncodedAuditLogEntry>> future = new CompletableFuture<>();
+        async(() -> future.complete(retrieveEncoded(userId, sessionId, from, to, limit, actionIds)));
+        return future;
+    }
+
+    /**
+     * Retrieves encoded audit log entries for a given user and optional filters.
+     *
+     * @param userId    The ID of the user whose logs to retrieve.
+     * @param sessionId The session ID to filter by, or null for any session.
+     * @param from      The start timestamp for filtering, or null for no lower bound.
+     * @param to        The end timestamp for filtering, or null for no upper bound.
+     * @param actionIds The action IDs to filter by, or null for any action.
+     * @param limit     The maximum number of entries to retrieve.
+     * @return The list of matching audit log entries.
+     */
+    public List<EncodedAuditLogEntry> retrieveEncoded(@NotNull UUID userId, @Nullable UUID sessionId, @Nullable Instant from, @Nullable Instant to, int limit, String... actionIds) {
         Preconditions.checkNotNull(userId, "User ID cannot be null");
         Preconditions.checkArgument(limit > 0, "Limit must be greater than 0");
-        List<AuditLogEntry<?>> entries = new ArrayList<>();
+        List<EncodedAuditLogEntry> entries = new ArrayList<>();
 
         run(connection -> {
             StringBuilder sqlBuilder = new StringBuilder("SELECT * FROM %s.%s WHERE user_id = ?");
@@ -279,7 +329,7 @@ public class StaticAudit {
             if (actionIds.length > 0) {
                 sqlBuilder.append(" AND action_id IN (?");
 
-                if (actionIds.length > 1 ) {
+                if (actionIds.length > 1) {
                     sqlBuilder.repeat(", ?", actionIds.length - 1);
                 }
 
@@ -308,18 +358,13 @@ public class StaticAudit {
                 ResultSet rs = statement.executeQuery();
                 while (rs.next()) {
                     String _actionId = rs.getString("action_id");
-                    Action<?> action = actions.get(_actionId);
-                    if (action == null) {
-                        logger.warn("Unknown action ID {} in audit log, skipping entry", _actionId);
-                        continue;
-                    }
-                    AuditLogEntry<?> entry = createEntry(
+                    EncodedAuditLogEntry entry = new EncodedAuditLogEntry(
                             (UUID) rs.getObject("user_id"),
                             (UUID) rs.getObject("session_id"),
                             rs.getString("application_group"),
                             rs.getString("application_id"),
                             rs.getTimestamp("timestamp").toInstant(),
-                            action,
+                            _actionId,
                             rs.getString("action_data")
                     );
                     entries.add(entry);
@@ -336,6 +381,18 @@ public class StaticAudit {
 
     private <T extends ActionData> T fromJson(Action<T> action, String json) {
         return action.fromJson(json);
+    }
+
+    private AuditLogEntry<?> createEntry(EncodedAuditLogEntry encoded) {
+        return createEntry(
+                encoded.getUserId(),
+                encoded.getSessionId(),
+                encoded.getApplicationGroup(),
+                encoded.getApplicationId(),
+                encoded.getTimestamp(),
+                actions.get(encoded.getActionId()),
+                encoded.getEncodedData()
+        );
     }
 
     private <T extends ActionData> AuditLogEntry<T> createEntry(

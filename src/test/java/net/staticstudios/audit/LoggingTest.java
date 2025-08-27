@@ -5,10 +5,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -101,6 +98,60 @@ public class LoggingTest extends AuditTest {
         assertTrue(entries.stream().allMatch(entry -> entry.getAction().getActionId().equals(action1.getActionId())));
         assertFalse(entries.stream().anyMatch(entry -> entry.getAction().getActionId().equals(action2.getActionId())));
         assertFalse(entries.stream().anyMatch(entry -> entry.getAction().getActionId().equals(action3.getActionId())));
+    }
+
+    @Test
+    public void testRetrievingEncoded() {
+        logMultiple(action1, 5);
+        logMultiple(action2, 3);
+        List<EncodedAuditLogEntry> encodedEntries = audit.retrieveEncoded(userId, null, null, null, 20);
+        assertEquals(8, encodedEntries.size());
+        assertTrue(encodedEntries.stream().anyMatch(e -> e.getActionId().equals(action1.getActionId())));
+        assertTrue(encodedEntries.stream().anyMatch(e -> e.getActionId().equals(action2.getActionId())));
+    }
+
+    @Test
+    public void testRetrievingEncodedWithUnknownAction() throws SQLException {
+        logMultiple(action1, 2);
+        String unknownActionId = "unknown_action";
+        String jsonData = "{\"data\":\"foobar\"}";
+        Connection connection = getConnection();
+        String sql = String.format("INSERT INTO %s.%s (log_id, timestamp, session_id, application_group, application_id, user_id, action_id, action_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb)", audit.getSchemaName(), audit.getTableName());
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setObject(1, UUID.randomUUID());
+            statement.setObject(2, Timestamp.from(Instant.now()));
+            statement.setObject(3, sessionId);
+            statement.setString(4, audit.getApplicationGroup());
+            statement.setString(5, audit.getApplicationId());
+            statement.setObject(6, userId);
+            statement.setString(7, unknownActionId);
+            statement.setString(8, jsonData);
+            statement.executeUpdate();
+        }
+        List<EncodedAuditLogEntry> encodedEntries = audit.retrieveEncoded(userId, null, null, null, 10);
+        assertTrue(encodedEntries.stream().anyMatch(e -> e.getActionId().equals(unknownActionId)));
+    }
+
+    @Test
+    public void testRetrievingWithUnknownActionIsFiltered() throws SQLException {
+        logMultiple(action1, 2);
+        String unknownActionId = "unknown_action";
+        String jsonData = "{\"data\":\"foobar\"}";
+        Connection connection = getConnection();
+        String sql = String.format("INSERT INTO %s.%s (log_id, timestamp, session_id, application_group, application_id, user_id, action_id, action_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb)", audit.getSchemaName(), audit.getTableName());
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setObject(1, UUID.randomUUID());
+            statement.setObject(2, Timestamp.from(Instant.now()));
+            statement.setObject(3, sessionId);
+            statement.setString(4, audit.getApplicationGroup());
+            statement.setString(5, audit.getApplicationId());
+            statement.setObject(6, userId);
+            statement.setString(7, unknownActionId);
+            statement.setString(8, jsonData);
+            statement.executeUpdate();
+        }
+        List<AuditLogEntry<?>> entries = audit.retrieve(userId, null, null, null, 10);
+        assertTrue(entries.stream().noneMatch(e -> e.getAction().getActionId().equals(unknownActionId)));
     }
 
     private void logMultiple(int count) {
