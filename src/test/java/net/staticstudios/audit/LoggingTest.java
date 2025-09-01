@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class LoggingTest extends AuditTest {
     private static final Instant NOW = Instant.ofEpochMilli(0);
+    private final String USER = "user";
     private StaticAudit audit;
     private UUID userId;
     private UUID sessionId;
@@ -51,15 +52,15 @@ public class LoggingTest extends AuditTest {
     @Test
     public void testLogging() throws SQLException {
         SimpleActionData data = new SimpleActionData("test");
-        audit.log(userId, sessionId, action1, data);
+        audit.log(USER, userId, sessionId, action1, data);
 
         Connection connection = getConnection();
-        @Language("SQL") String sql = "SELECT * FROM %s.%s WHERE user_id = ?";
+        @Language("SQL") String sql = "SELECT * FROM %s.%s WHERE actor_id = ?";
         PreparedStatement statement = connection.prepareStatement(sql.formatted(audit.getSchemaName(), audit.getTableName()));
         statement.setObject(1, userId);
         ResultSet rs = statement.executeQuery();
         assertTrue(rs.next());
-        assertEquals(userId, rs.getObject("user_id"));
+        assertEquals(userId, rs.getObject("actor_id"));
         assertEquals(sessionId, rs.getObject("session_id"));
         assertEquals(action1.getActionId(), rs.getString("action_id"));
         assertEquals(data, action1.fromJson(rs.getString("action_data")));
@@ -70,9 +71,9 @@ public class LoggingTest extends AuditTest {
         logMultiple(50);
 
         List<AuditLogEntry<?>> entries;
-        entries = audit.retrieve(userId, null, null, null, 100);
+        entries = audit.retrieve(USER, userId, null, null, null, 100);
         assertEquals(50, entries.size());
-        entries = audit.retrieve(userId, null, null, null, 10);
+        entries = audit.retrieve(USER, userId, null, null, null, 10);
         assertEquals(10, entries.size());
 
         for (int i = 0; i < 10; i++) {
@@ -88,12 +89,12 @@ public class LoggingTest extends AuditTest {
 
         List<AuditLogEntry<?>> entries;
 
-        entries = audit.retrieve(userId, null, null, null, 500);
+        entries = audit.retrieve(USER, userId, null, null, null, 500);
         assertEquals(140, entries.size());
-        entries = audit.retrieve(userId, null, null, null, 100, action1.getActionId(), action3.getActionId());
+        entries = audit.retrieve(USER, userId, null, null, null, 100, action1.getActionId(), action3.getActionId());
         assertEquals(100, entries.size());
         assertFalse(entries.stream().anyMatch(entry -> entry.getAction().getActionId().equals(action2.getActionId())));
-        entries = audit.retrieve(userId, null, null, null, 10, action1.getActionId());
+        entries = audit.retrieve(USER, userId, null, null, null, 10, action1.getActionId());
         assertEquals(10, entries.size());
         assertTrue(entries.stream().allMatch(entry -> entry.getAction().getActionId().equals(action1.getActionId())));
         assertFalse(entries.stream().anyMatch(entry -> entry.getAction().getActionId().equals(action2.getActionId())));
@@ -104,7 +105,7 @@ public class LoggingTest extends AuditTest {
     public void testRetrievingEncoded() {
         logMultiple(action1, 5);
         logMultiple(action2, 3);
-        List<EncodedAuditLogEntry> encodedEntries = audit.retrieveEncoded(userId, null, null, null, 20);
+        List<EncodedAuditLogEntry> encodedEntries = audit.retrieveEncoded(USER, userId, null, null, null, 20);
         assertEquals(8, encodedEntries.size());
         assertTrue(encodedEntries.stream().anyMatch(e -> e.getActionId().equals(action1.getActionId())));
         assertTrue(encodedEntries.stream().anyMatch(e -> e.getActionId().equals(action2.getActionId())));
@@ -116,19 +117,20 @@ public class LoggingTest extends AuditTest {
         String unknownActionId = "unknown_action";
         String jsonData = "{\"data\":\"foobar\"}";
         Connection connection = getConnection();
-        String sql = String.format("INSERT INTO %s.%s (log_id, timestamp, session_id, application_group, application_id, user_id, action_id, action_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb)", audit.getSchemaName(), audit.getTableName());
+        String sql = String.format("INSERT INTO %s.%s (log_id, timestamp, session_id, application_group, application_id, actor_type, actor_id, action_id, action_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)", audit.getSchemaName(), audit.getTableName());
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setObject(1, UUID.randomUUID());
             statement.setObject(2, Timestamp.from(Instant.now()));
             statement.setObject(3, sessionId);
             statement.setString(4, audit.getApplicationGroup());
             statement.setString(5, audit.getApplicationId());
-            statement.setObject(6, userId);
-            statement.setString(7, unknownActionId);
-            statement.setString(8, jsonData);
+            statement.setString(6, USER);
+            statement.setObject(7, userId);
+            statement.setString(8, unknownActionId);
+            statement.setString(9, jsonData);
             statement.executeUpdate();
         }
-        List<EncodedAuditLogEntry> encodedEntries = audit.retrieveEncoded(userId, null, null, null, 10);
+        List<EncodedAuditLogEntry> encodedEntries = audit.retrieveEncoded(USER, userId, null, null, null, 10);
         assertTrue(encodedEntries.stream().anyMatch(e -> e.getActionId().equals(unknownActionId)));
     }
 
@@ -138,19 +140,20 @@ public class LoggingTest extends AuditTest {
         String unknownActionId = "unknown_action";
         String jsonData = "{\"data\":\"foobar\"}";
         Connection connection = getConnection();
-        String sql = String.format("INSERT INTO %s.%s (log_id, timestamp, session_id, application_group, application_id, user_id, action_id, action_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb)", audit.getSchemaName(), audit.getTableName());
+        String sql = String.format("INSERT INTO %s.%s (log_id, timestamp, session_id, application_group, application_id, actor_type, actor_id, action_id, action_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)", audit.getSchemaName(), audit.getTableName());
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setObject(1, UUID.randomUUID());
             statement.setObject(2, Timestamp.from(Instant.now()));
             statement.setObject(3, sessionId);
             statement.setString(4, audit.getApplicationGroup());
             statement.setString(5, audit.getApplicationId());
-            statement.setObject(6, userId);
-            statement.setString(7, unknownActionId);
-            statement.setString(8, jsonData);
+            statement.setString(6, USER);
+            statement.setObject(7, userId);
+            statement.setString(8, unknownActionId);
+            statement.setString(9, jsonData);
             statement.executeUpdate();
         }
-        List<AuditLogEntry<?>> entries = audit.retrieve(userId, null, null, null, 10);
+        List<AuditLogEntry<?>> entries = audit.retrieve(USER, userId, null, null, null, 10);
         assertTrue(entries.stream().noneMatch(e -> e.getAction().getActionId().equals(unknownActionId)));
     }
 
@@ -162,7 +165,7 @@ public class LoggingTest extends AuditTest {
         for (int i = 0; i < count; i++) {
             SimpleActionData data = new SimpleActionData("test" + i);
             Instant timestamp = NOW.plusSeconds(i);
-            audit.log(userId, sessionId, timestamp, action, data);
+            audit.log(USER, userId, sessionId, timestamp, action, data);
         }
     }
 }

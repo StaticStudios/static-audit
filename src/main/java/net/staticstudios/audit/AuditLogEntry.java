@@ -11,7 +11,8 @@ import java.util.UUID;
  * Represents an entry in the audit log.
  */
 public class AuditLogEntry<T extends ActionData> {
-    private final @NotNull UUID userId;
+    private final @NotNull String actorType;
+    private final @NotNull UUID actorId;
     private final @Nullable UUID sessionId;
     private final @NotNull String applicationGroup;
     private final @NotNull String applicationId;
@@ -22,7 +23,8 @@ public class AuditLogEntry<T extends ActionData> {
     /**
      * Creates a new AuditLogEntry.
      *
-     * @param userId           the ID of the user who performed the action
+     * @param actorType        the type of actor who performed the action (e.g., "user", "server")
+     * @param actorId          the ID of the actor who performed the action
      * @param sessionId        the ID of the session in which the action was performed (nullable)
      * @param applicationGroup the application group that logged the action
      * @param applicationId    the application ID that logged the action
@@ -30,8 +32,9 @@ public class AuditLogEntry<T extends ActionData> {
      * @param action           the action that was performed
      * @param data             the data associated with the action
      */
-    public AuditLogEntry(@NotNull UUID userId, @Nullable UUID sessionId, @NotNull String applicationGroup, @NotNull String applicationId, @NotNull Instant timestamp, @NotNull Action<T> action, @NotNull T data) {
-        this.userId = userId;
+    public AuditLogEntry(@NotNull String actorType, @NotNull UUID actorId, @Nullable UUID sessionId, @NotNull String applicationGroup, @NotNull String applicationId, @NotNull Instant timestamp, @NotNull Action<T> action, @NotNull T data) {
+        this.actorType = actorType;
+        this.actorId = actorId;
         this.sessionId = sessionId;
         this.applicationGroup = applicationGroup;
         this.applicationId = applicationId;
@@ -41,12 +44,21 @@ public class AuditLogEntry<T extends ActionData> {
     }
 
     /**
-     * Gets the ID of the user who performed the action.
+     * Gets the type of actor who performed the action.
      *
-     * @return the user ID
+     * @return the actor type (e.g., "user", "server")
      */
-    public @NotNull UUID getUserId() {
-        return userId;
+    public @NotNull String getActorType() {
+        return actorType;
+    }
+
+    /**
+     * Gets the ID of the actor who performed the action.
+     *
+     * @return the actor ID
+     */
+    public @NotNull UUID getActorId() {
+        return actorId;
     }
 
     /**
@@ -110,8 +122,8 @@ public class AuditLogEntry<T extends ActionData> {
      */
     @Override
     public String toString() {
-        return String.format("AuditLogEntry{userId=%s, sessionId=%s, applicationGroup='%s', applicationId='%s', timestamp=%s, action=%s, data=%s}",
-                userId, sessionId, applicationGroup, applicationId, timestamp, action, data);
+        return String.format("AuditLogEntry{actorType=%s, actorId=%s, sessionId=%s, applicationGroup='%s', applicationId='%s', timestamp=%s, action=%s, data=%s}",
+                actorType, actorId, sessionId, applicationGroup, applicationId, timestamp, action, data);
     }
 
     /**
@@ -126,7 +138,8 @@ public class AuditLogEntry<T extends ActionData> {
         if (obj == null || getClass() != obj.getClass()) return false;
         AuditLogEntry<?> that = (AuditLogEntry<?>) obj;
         return Objects.equals(action, that.action) && Objects.equals(data, that.data) &&
-                Objects.equals(userId, that.userId) && Objects.equals(sessionId, that.sessionId) &&
+                Objects.equals(actorType, that.actorType) &&
+                Objects.equals(actorId, that.actorId) && Objects.equals(sessionId, that.sessionId) &&
                 Objects.equals(applicationGroup, that.applicationGroup) && Objects.equals(applicationId, that.applicationId)
                 && Objects.equals(timestamp, that.timestamp);
     }
@@ -138,6 +151,6 @@ public class AuditLogEntry<T extends ActionData> {
      */
     @Override
     public int hashCode() {
-        return Objects.hash(action, data, userId, sessionId, applicationGroup, applicationId, timestamp);
+        return Objects.hash(action, data, actorType, actorId, sessionId, applicationGroup, applicationId, timestamp);
     }
 }
