@@ -45,7 +45,7 @@ public class BasicTest extends AuditTest {
 
     @Test
     public void testSimpleActionSerialization() {
-        Action.SimpleAction<SimpleActionData> action = (Action.SimpleAction<SimpleActionData>) Action.simple("action1", SimpleActionData.class);
+        Action<SimpleActionData> action = Action.simple("action1", SimpleActionData.class);
         SimpleActionData data = new SimpleActionData("test");
         String json = action.toJson(data);
         assertEquals("{\"data\":\"test\"}", json);

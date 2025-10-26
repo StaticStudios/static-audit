@@ -17,9 +17,9 @@ public class LoggingTest extends AuditTest {
     private StaticAudit audit;
     private UUID userId;
     private UUID sessionId;
-    private Action.SimpleAction<SimpleActionData> action1;
-    private Action.SimpleAction<SimpleActionData> action2;
-    private Action.SimpleAction<SimpleActionData> action3;
+    private Action<SimpleActionData> action1;
+    private Action<SimpleActionData> action2;
+    private Action<SimpleActionData> action3;
 
     @BeforeEach
     public void setUp() {
@@ -33,9 +33,9 @@ public class LoggingTest extends AuditTest {
 
         userId = UUID.randomUUID();
         sessionId = UUID.randomUUID();
-        action1 = (Action.SimpleAction<SimpleActionData>) Action.simple("test_action", SimpleActionData.class);
-        action2 = (Action.SimpleAction<SimpleActionData>) Action.simple("test_action_2", SimpleActionData.class);
-        action3 = (Action.SimpleAction<SimpleActionData>) Action.simple("test_action_3", SimpleActionData.class);
+        action1 = Action.simple("test_action", SimpleActionData.class);
+        action2 = Action.simple("test_action_2", SimpleActionData.class);
+        action3 = Action.simple("test_action_3", SimpleActionData.class);
         audit.registerAction(action1);
         audit.registerAction(action2);
         audit.registerAction(action3);
