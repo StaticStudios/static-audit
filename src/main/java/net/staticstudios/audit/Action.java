@@ -29,12 +29,21 @@ public interface Action<T extends ActionData> {
     String getActionId();
 
     /**
+     * Get the class of the action data.
+     *
+     * @return the action data class
+     */
+    Class<T> getDataType();
+
+    /**
      * Convert the given action data to a JSON string.
      *
      * @param data the action data to convert
      * @return the JSON representation of the action data
      */
-    String toJson(T data);
+    default String toJson(T data) {
+        return GSON_INSTANCE.toJson(data);
+    }
 
     /**
      * Convert the given JSON string to action data.
@@ -42,14 +51,9 @@ public interface Action<T extends ActionData> {
      * @param json the JSON string to convert
      * @return the action data
      */
-    T fromJson(String json);
-
-    /**
-     * Get the class of the action data.
-     *
-     * @return the action data class
-     */
-    Class<T> getDataType();
+    default T fromJson(String json) {
+        return GSON_INSTANCE.fromJson(json, getDataType());
+    }
 
     /**
      * A simple implementation of the Action interface.
@@ -66,16 +70,6 @@ public interface Action<T extends ActionData> {
         @Override
         public String getActionId() {
             return actionId;
-        }
-
-        @Override
-        public String toJson(T data) {
-            return GSON_INSTANCE.toJson(data);
-        }
-
-        @Override
-        public T fromJson(String json) {
-            return GSON_INSTANCE.fromJson(json, actionDataClass);
         }
 
         @Override
