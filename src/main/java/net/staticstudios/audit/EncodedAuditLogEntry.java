@@ -7,7 +7,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 public class EncodedAuditLogEntry {
-    private final @NotNull UUID userId;
+    private final @NotNull AuditUser user;
     private final @Nullable UUID sessionId;
     private final @NotNull String applicationGroup;
     private final @NotNull String applicationId;
@@ -15,8 +15,8 @@ public class EncodedAuditLogEntry {
     private final @NotNull String actionId;
     private final @NotNull String encodedData;
 
-    public EncodedAuditLogEntry(@NotNull UUID userId, @Nullable UUID sessionId, @NotNull String applicationGroup, @NotNull String applicationId, @NotNull Instant timestamp, @NotNull String actionId, @NotNull String encodedData) {
-        this.userId = userId;
+    public EncodedAuditLogEntry(@NotNull AuditUser user, @Nullable UUID sessionId, @NotNull String applicationGroup, @NotNull String applicationId, @NotNull Instant timestamp, @NotNull String actionId, @NotNull String encodedData) {
+        this.user = user;
         this.sessionId = sessionId;
         this.applicationGroup = applicationGroup;
         this.applicationId = applicationId;
@@ -25,8 +25,8 @@ public class EncodedAuditLogEntry {
         this.encodedData = encodedData;
     }
 
-    public @NotNull UUID getUserId() {
-        return userId;
+    public @NotNull AuditUser getUser() {
+        return user;
     }
 
     public @Nullable UUID getSessionId() {
