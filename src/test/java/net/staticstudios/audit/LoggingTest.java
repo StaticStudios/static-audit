@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 public class LoggingTest extends AuditTest {
     private static final Instant NOW = Instant.ofEpochMilli(0);
     private StaticAudit audit;
-    private UUID userId;
+    private AuditUser auditUser;
     private UUID sessionId;
     private Action<SimpleActionData> action1;
     private Action<SimpleActionData> action2;
@@ -31,7 +31,7 @@ public class LoggingTest extends AuditTest {
                 .closeConnections(false)
                 .build();
 
-        userId = UUID.randomUUID();
+        auditUser = AuditUser.of(UUID.randomUUID());
         sessionId = UUID.randomUUID();
         action1 = Action.simple("test_action", SimpleActionData.class);
         action2 = Action.simple("test_action_2", SimpleActionData.class);
@@ -51,15 +51,15 @@ public class LoggingTest extends AuditTest {
     @Test
     public void testLogging() throws SQLException {
         SimpleActionData data = new SimpleActionData("test");
-        audit.log(userId, sessionId, action1, data);
+        audit.log(auditUser, sessionId, action1, data);
 
         Connection connection = getConnection();
         @Language("SQL") String sql = "SELECT * FROM %s.%s WHERE user_id = ?";
         PreparedStatement statement = connection.prepareStatement(sql.formatted(audit.getSchemaName(), audit.getTableName()));
-        statement.setObject(1, userId);
+        statement.setObject(1, auditUser.getId());
         ResultSet rs = statement.executeQuery();
         assertTrue(rs.next());
-        assertEquals(userId, rs.getObject("user_id"));
+        assertEquals(auditUser.getId(), rs.getObject("user_id"));
         assertEquals(sessionId, rs.getObject("session_id"));
         assertEquals(action1.getActionId(), rs.getString("action_id"));
         assertEquals(data, action1.fromJson(rs.getString("action_data")));
@@ -69,10 +69,11 @@ public class LoggingTest extends AuditTest {
     public void testRetrieving() {
         logMultiple(50);
 
+
         List<AuditLogEntry<?>> entries;
-        entries = audit.retrieve(userId, null, null, null, 100);
+        entries = audit.retrieve(auditUser, null, null, null, 100);
         assertEquals(50, entries.size());
-        entries = audit.retrieve(userId, null, null, null, 10);
+        entries = audit.retrieve(auditUser, null, null, null, 10);
         assertEquals(10, entries.size());
 
         for (int i = 0; i < 10; i++) {
@@ -88,12 +89,12 @@ public class LoggingTest extends AuditTest {
 
         List<AuditLogEntry<?>> entries;
 
-        entries = audit.retrieve(userId, null, null, null, 500);
+        entries = audit.retrieve(auditUser, null, null, null, 500);
         assertEquals(140, entries.size());
-        entries = audit.retrieve(userId, null, null, null, 100, action1.getActionId(), action3.getActionId());
+        entries = audit.retrieve(auditUser, null, null, null, 100, action1.getActionId(), action3.getActionId());
         assertEquals(100, entries.size());
         assertFalse(entries.stream().anyMatch(entry -> entry.getAction().getActionId().equals(action2.getActionId())));
-        entries = audit.retrieve(userId, null, null, null, 10, action1.getActionId());
+        entries = audit.retrieve(auditUser, null, null, null, 10, action1.getActionId());
         assertEquals(10, entries.size());
         assertTrue(entries.stream().allMatch(entry -> entry.getAction().getActionId().equals(action1.getActionId())));
         assertFalse(entries.stream().anyMatch(entry -> entry.getAction().getActionId().equals(action2.getActionId())));
@@ -104,7 +105,7 @@ public class LoggingTest extends AuditTest {
     public void testRetrievingEncoded() {
         logMultiple(action1, 5);
         logMultiple(action2, 3);
-        List<EncodedAuditLogEntry> encodedEntries = audit.retrieveEncoded(userId, null, null, null, 20);
+        List<EncodedAuditLogEntry> encodedEntries = audit.retrieveEncoded(auditUser, null, null, null, 20);
         assertEquals(8, encodedEntries.size());
         assertTrue(encodedEntries.stream().anyMatch(e -> e.getActionId().equals(action1.getActionId())));
         assertTrue(encodedEntries.stream().anyMatch(e -> e.getActionId().equals(action2.getActionId())));
@@ -123,12 +124,12 @@ public class LoggingTest extends AuditTest {
             statement.setObject(3, sessionId);
             statement.setString(4, audit.getApplicationGroup());
             statement.setString(5, audit.getApplicationId());
-            statement.setObject(6, userId);
+            statement.setObject(6, auditUser.getId());
             statement.setString(7, unknownActionId);
             statement.setString(8, jsonData);
             statement.executeUpdate();
         }
-        List<EncodedAuditLogEntry> encodedEntries = audit.retrieveEncoded(userId, null, null, null, 10);
+        List<EncodedAuditLogEntry> encodedEntries = audit.retrieveEncoded(auditUser, null, null, null, 10);
         assertTrue(encodedEntries.stream().anyMatch(e -> e.getActionId().equals(unknownActionId)));
     }
 
@@ -145,12 +146,12 @@ public class LoggingTest extends AuditTest {
             statement.setObject(3, sessionId);
             statement.setString(4, audit.getApplicationGroup());
             statement.setString(5, audit.getApplicationId());
-            statement.setObject(6, userId);
+            statement.setObject(6, auditUser.getId());
             statement.setString(7, unknownActionId);
             statement.setString(8, jsonData);
             statement.executeUpdate();
         }
-        List<AuditLogEntry<?>> entries = audit.retrieve(userId, null, null, null, 10);
+        List<AuditLogEntry<?>> entries = audit.retrieve(auditUser, null, null, null, 10);
         assertTrue(entries.stream().noneMatch(e -> e.getAction().getActionId().equals(unknownActionId)));
     }
 
@@ -162,7 +163,7 @@ public class LoggingTest extends AuditTest {
         for (int i = 0; i < count; i++) {
             SimpleActionData data = new SimpleActionData("test" + i);
             Instant timestamp = NOW.plusSeconds(i);
-            audit.log(userId, sessionId, timestamp, action, data);
+            audit.log(auditUser, sessionId, timestamp, action, data);
         }
     }
 }
