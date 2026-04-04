@@ -166,10 +166,9 @@ public class StaticAudit {
      * @param timestamp  The timestamp of when the action occurred.
      * @param action     The action being performed.
      * @param actionData The data associated with the action.
-     * @return The StaticAudit instance.
      */
-    public <T extends ActionData> StaticAudit log(@NotNull SimpleAuditUser user, @Nullable UUID sessionId, @NotNull Instant timestamp, @NotNull Action<T> action, @NotNull T actionData) {
-        return log(user, sessionId, timestamp, action.getActionId(), actionData);
+    public <T extends ActionData> void log(@NotNull SimpleAuditUser user, @Nullable UUID sessionId, @NotNull Instant timestamp, @NotNull Action<T> action, @NotNull T actionData) {
+        log(user.getAuditId(), sessionId, timestamp, action.getActionId(), actionData);
     }
 
     /**
@@ -179,10 +178,13 @@ public class StaticAudit {
      * @param sessionId  The user's current session ID, if applicable.
      * @param action     The action being performed.
      * @param actionData The data associated with the action.
-     * @return The StaticAudit instance.
      */
-    public <T extends ActionData> StaticAudit log(@NotNull SimpleAuditUser user, @Nullable UUID sessionId, @NotNull Action<T> action, @NotNull T actionData) {
-        return log(user, sessionId, Instant.now(), action.getActionId(), actionData);
+    public <T extends ActionData> void log(@NotNull SimpleAuditUser user, @Nullable UUID sessionId, @NotNull Action<T> action, @NotNull T actionData) {
+        log(user.getAuditId(), sessionId, Instant.now(), action.getActionId(), actionData);
+    }
+    
+    public <T extends ActionData> void log(@NotNull AuditUser user, @Nullable UUID sessionId, @NotNull Action<T> action, @NotNull T actionData) {
+        log(user.getAuditId(), sessionId, Instant.now(), action.getActionId(), actionData);
     }
 
     /**
@@ -192,10 +194,24 @@ public class StaticAudit {
      * @param sessionId  The user's current session ID, if applicable.
      * @param actionId   The ID of the action being performed.
      * @param actionData The data associated with the action.
-     * @return The StaticAudit instance.
      */
-    public StaticAudit log(@NotNull SimpleAuditUser user, @Nullable UUID sessionId, @NotNull String actionId, @NotNull Object actionData) {
-        return log(user, sessionId, Instant.now(), actionId, actionData);
+    public void log(@NotNull SimpleAuditUser user, @Nullable UUID sessionId, @NotNull String actionId, @NotNull Object actionData) {
+        log(user.getAuditId(), sessionId, Instant.now(), actionId, actionData);
+    }
+
+    /**
+     * Logs an action to the audit log.
+     * @param user The ID of the user performing the action.
+     * @param sessionId The user's current session ID, if applicable.
+     * @param actionId The ID of the action being performed.
+     * @param actionData The data associated with the action.
+     */
+    public void log(AuditUser user, @Nullable UUID sessionId, @NotNull String actionId, @NotNull Object actionData) {
+        log(user.getAuditId(), sessionId, actionId, actionData);
+    }
+
+    private void log(String user, @Nullable UUID sessionId, @NotNull String actionId, @NotNull Object actionData) {
+        log(user, sessionId, Instant.now(), actionId, actionData);
     }
 
 
@@ -207,9 +223,8 @@ public class StaticAudit {
      * @param timestamp  The timestamp of when the action occurred.
      * @param actionId   The ID of the action being performed.
      * @param actionData The data associated with the action.
-     * @return The StaticAudit instance.
      */
-    public StaticAudit log(@NotNull SimpleAuditUser user, @Nullable UUID sessionId, @NotNull Instant timestamp, @NotNull String actionId, @NotNull Object actionData) {
+    public void log(@NotNull String user, @Nullable UUID sessionId, @NotNull Instant timestamp, @NotNull String actionId, @NotNull Object actionData) {
         Preconditions.checkNotNull(user, "User cannot be null");
         Preconditions.checkNotNull(timestamp, "Timestamp cannot be null");
         Preconditions.checkNotNull(actionId, "Action ID cannot be null");
@@ -227,15 +242,13 @@ public class StaticAudit {
                 statement.setObject(3, sessionId);
                 statement.setString(4, applicationGroup);
                 statement.setString(5, applicationId);
-                statement.setObject(6, user.getAuditId());
+                statement.setObject(6, user);
                 statement.setString(7, actionId);
                 statement.setString(8, actionDataJson);
                 logger.trace(statement.toString());
                 statement.executeUpdate();
             }
         });
-
-        return this;
     }
 
     /**
