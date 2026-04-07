@@ -230,7 +230,10 @@ public class StaticAudit {
         Preconditions.checkNotNull(actionId, "Action ID cannot be null");
         Preconditions.checkNotNull(actionData, "Action data cannot be null");
         Action<?> action = actions.get(actionId);
-        Preconditions.checkNotNull(action, "Action ID %s is not registered", actionId);
+        if (action == null) {
+            logger.error("Unknown action ID {}, log will not be recorded", actionId);
+            return;
+        }
         Preconditions.checkArgument(action.getDataType().isInstance(actionData), "Action data is not of type %s", action.getDataType().getName());
         String actionDataJson = toJson(action, actionData);
         Preconditions.checkNotNull(actionDataJson, "Action data JSON cannot be null");
