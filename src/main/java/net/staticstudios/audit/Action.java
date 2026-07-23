@@ -1,14 +1,11 @@
 package net.staticstudios.audit;
 
-import com.google.gson.Gson;
-
 import java.util.Objects;
 
 /**
  * Represents an action that can be logged in the audit system.
  */
 public interface Action<T extends ActionData> {
-    Gson GSON_INSTANCE = new Gson();
 
     /**
      * Create a simple action with the given ID and data class.
@@ -38,21 +35,23 @@ public interface Action<T extends ActionData> {
     /**
      * Convert the given action data to a JSON string.
      *
-     * @param data the action data to convert
+     * @param staticAudit the StaticAudit instance to use for JSON conversion
+     * @param data        the action data to convert
      * @return the JSON representation of the action data
      */
-    default String toJson(T data) {
-        return GSON_INSTANCE.toJson(data);
+    default String toJson(StaticAudit staticAudit, T data) {
+        return staticAudit.getGson().toJson(data);
     }
 
     /**
      * Convert the given JSON string to action data.
      *
-     * @param json the JSON string to convert
+     * @param staticAudit the StaticAudit instance to use for JSON conversion
+     * @param json        the JSON string to convert
      * @return the action data
      */
-    default T fromJson(String json) {
-        return GSON_INSTANCE.fromJson(json, getDataType());
+    default T fromJson(StaticAudit staticAudit, String json) {
+        return staticAudit.getGson().fromJson(json, getDataType());
     }
 
     /**

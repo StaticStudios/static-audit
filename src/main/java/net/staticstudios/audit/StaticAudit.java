@@ -1,6 +1,7 @@
 package net.staticstudios.audit;
 
 import com.google.common.base.Preconditions;
+import com.google.gson.Gson;
 import net.staticstudios.utils.ThreadUtils;
 import org.intellij.lang.annotations.Language;
 import org.jetbrains.annotations.NotNull;
@@ -48,8 +49,9 @@ public class StaticAudit {
     private final boolean closeConnections;
     private final Supplier<Connection> connectionSupplier;
     private final Map<String, Action<?>> actions = new ConcurrentHashMap<>();
+    private final Gson gson;
 
-    private StaticAudit(String applicationGroup, String applicationId, String schemaName, String tableName, boolean async, boolean closeConnections, Supplier<Connection> connectionSupplier) {
+    private StaticAudit(String applicationGroup, String applicationId, String schemaName, String tableName, boolean async, boolean closeConnections, Supplier<Connection> connectionSupplier, Gson gson) {
         this.applicationGroup = applicationGroup;
         this.applicationId = applicationId;
         this.schemaName = schemaName;
@@ -57,6 +59,7 @@ public class StaticAudit {
         this.async = async;
         this.closeConnections = closeConnections;
         this.connectionSupplier = connectionSupplier;
+        this.gson = gson;
 
         run(connection -> {
             logger.info("Creating audit log table... ({}.{})", schemaName, tableName);
@@ -182,7 +185,7 @@ public class StaticAudit {
     public <T extends ActionData> void log(@NotNull SimpleAuditUser user, @Nullable UUID sessionId, @NotNull Action<T> action, @NotNull T actionData) {
         log(user.getAuditId(), sessionId, Instant.now(), action.getActionId(), actionData);
     }
-    
+
     public <T extends ActionData> void log(@NotNull AuditUser user, @Nullable UUID sessionId, @NotNull Action<T> action, @NotNull T actionData) {
         log(user.getAuditId(), sessionId, Instant.now(), action.getActionId(), actionData);
     }
@@ -190,7 +193,7 @@ public class StaticAudit {
     /**
      * Logs an action to the audit log.
      *
-     * @param user     The ID of the user performing the action.
+     * @param user       The ID of the user performing the action.
      * @param sessionId  The user's current session ID, if applicable.
      * @param actionId   The ID of the action being performed.
      * @param actionData The data associated with the action.
@@ -201,9 +204,10 @@ public class StaticAudit {
 
     /**
      * Logs an action to the audit log.
-     * @param user The ID of the user performing the action.
-     * @param sessionId The user's current session ID, if applicable.
-     * @param actionId The ID of the action being performed.
+     *
+     * @param user       The ID of the user performing the action.
+     * @param sessionId  The user's current session ID, if applicable.
+     * @param actionId   The ID of the action being performed.
      * @param actionData The data associated with the action.
      */
     public void log(AuditUser user, @Nullable UUID sessionId, @NotNull String actionId, @NotNull Object actionData) {
@@ -394,12 +398,16 @@ public class StaticAudit {
         return entries;
     }
 
+    public Gson getGson() {
+        return gson;
+    }
+
     private <T extends ActionData> String toJson(Action<T> action, Object data) {
-        return action.toJson(action.getDataType().cast(data));
+        return action.toJson(this, action.getDataType().cast(data));
     }
 
     private <T extends ActionData> T fromJson(Action<T> action, String json) {
-        return action.fromJson(json);
+        return action.fromJson(this, json);
     }
 
     private AuditLogEntry<?> createEntry(EncodedAuditLogEntry encoded) {
@@ -434,6 +442,7 @@ public class StaticAudit {
         private boolean async = true;
         private boolean closeConnections = true;
         private Supplier<Connection> connectionSupplier;
+        private Gson gson = new Gson();
 
         private Builder() {
         }
@@ -523,6 +532,17 @@ public class StaticAudit {
         }
 
         /**
+         * Sets the Gson instance to be used for JSON serialization and deserialization of action data.
+         *
+         * @param gson The Gson instance.
+         * @return The builder instance.
+         */
+        public Builder gson(Gson gson) {
+            this.gson = gson;
+            return this;
+        }
+
+        /**
          * Builds and returns a configured StaticAudit instance.
          *
          * @return A new StaticAudit instance.
@@ -532,7 +552,8 @@ public class StaticAudit {
             Preconditions.checkNotNull(applicationGroup, "Application group cannot be null");
             Preconditions.checkNotNull(applicationId, "Application ID cannot be null");
             Preconditions.checkNotNull(connectionSupplier, "Connection supplier cannot be null");
-            return new StaticAudit(applicationGroup, applicationId, schemaName, tableName, async, closeConnections, connectionSupplier);
+            Preconditions.checkArgument(!applicationGroup.isEmpty(), "Application group cannot be empty");
+            return new StaticAudit(applicationGroup, applicationId, schemaName, tableName, async, closeConnections, connectionSupplier, gson);
         }
     }
 }

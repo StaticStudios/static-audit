@@ -62,7 +62,7 @@ public class LoggingTest extends AuditTest {
         assertEquals(auditUser.getAuditId(), rs.getObject("user_id"));
         assertEquals(sessionId, rs.getObject("session_id"));
         assertEquals(action1.getActionId(), rs.getString("action_id"));
-        assertEquals(data, action1.fromJson(rs.getString("action_data")));
+        assertEquals(data, action1.fromJson(audit, rs.getString("action_data")));
     }
 
     @Test
